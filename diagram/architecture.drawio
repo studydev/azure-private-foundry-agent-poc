@@ -1,0 +1,409 @@
+<mxfile host="app.diagrams.net" modified="2026-08-14T00:00:00.000Z" agent="azure-deploy" version="31.1.8">
+  <diagram id="acaFoundryPrivate" name="Private VNet - ACA + AI Foundry Agent">
+    <mxGraphModel dx="2400" dy="1500" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Azure AI Foundry Agent Service + Container Apps &#8212; Private VNet Isolation (PoC)" style="text;html=1;fontSize=30;fontStyle=1;align=left;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="1300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Region: Korea Central &#183; Standard setup with network injection &#183; No public ingress &#183; All dependencies reached over Private Endpoints" style="text;html=1;fontSize=16;align=left;verticalAlign=middle;fontColor=#5A6B7D;" vertex="1" parent="1">
+          <mxGeometry x="60" y="70" width="1400" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- ============ PUBLIC INTERNET ZONE ============ -->
+        <mxCell id="zPublic" value="" style="rounded=1;arcSize=6;html=1;fillColor=#FDF3F3;strokeColor=#D64550;strokeWidth=2;dashed=1;dashPattern=8 6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="130" width="440" height="560" as="geometry" />
+        </mxCell>
+        <mxCell id="zPublicLbl" value="PUBLIC INTERNET" style="text;html=1;fontSize=15;fontStyle=1;align=left;verticalAlign=middle;fontColor=#D64550;" vertex="1" parent="1">
+          <mxGeometry x="84" y="146" width="300" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="gh" value="" style="shape=mxgraph.weblogos.github;dashed=0;outlineConnect=0;html=1;align=center;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="128" y="210" width="72" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="ghLbl" value="GitHub Actions runner&#10;(GitHub-hosted, public)" style="text;html=1;fontSize=13;align=center;verticalAlign=top;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="80" y="288" width="168" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="arm" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/management_governance/Resource_Graph_Explorer.svg;" vertex="1" parent="1">
+          <mxGeometry x="322" y="212" width="68" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="armLbl" value="Azure Resource Manager&#10;(control plane &#8212; always public)" style="text;html=1;fontSize=13;align=center;verticalAlign=top;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="276" y="288" width="176" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="dev" value="" style="shape=mxgraph.azure.user;verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;strokeColor=none;fillColor=#0078D4;" vertex="1" parent="1">
+          <mxGeometry x="140" y="404" width="48" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="devLbl" value="Developer" style="text;html=1;fontSize=13;align=center;verticalAlign=top;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="106" y="460" width="116" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="blockBox" value="" style="rounded=1;arcSize=10;html=1;fillColor=#FBE3E4;strokeColor=#D64550;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="92" y="530" width="376" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="blockTxt" value="&#10008;&#160; Direct data-plane access is BLOCKED&#10;&#10;Foundry publicNetworkAccess = Disabled&#10;Container App ingress = internal only&#10;Cosmos / Search / Storage / KV public access = Disabled" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;fontColor=#A32530;spacingLeft=12;" vertex="1" parent="1">
+          <mxGeometry x="104" y="542" width="356" height="96" as="geometry" />
+        </mxCell>
+
+        <!-- ============ VNET ZONE ============ -->
+        <mxCell id="zVnet" value="" style="rounded=1;arcSize=3;html=1;fillColor=#F2F8FD;strokeColor=#0078D4;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="580" y="130" width="1540" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="zVnetLbl" value="Virtual Network &#160;vnet-acafoundry-poc &#160;&#183;&#160; 10.0.0.0/16 &#160;&#183;&#160; Korea Central" style="text;html=1;fontSize=17;fontStyle=1;align=left;verticalAlign=middle;fontColor=#005A9E;" vertex="1" parent="1">
+          <mxGeometry x="606" y="148" width="900" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="vnetIcon" value="" style="shape=mxgraph.azure.virtual_network;verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;strokeColor=none;fillColor=#0078D4;" vertex="1" parent="1">
+          <mxGeometry x="2040" y="148" width="50" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- subnet: ACA -->
+        <mxCell id="snAca" value="" style="rounded=1;arcSize=4;html=1;fillColor=#FFFFFF;strokeColor=#5B9BD5;strokeWidth=2;dashed=1;dashPattern=6 4;" vertex="1" parent="1">
+          <mxGeometry x="620" y="212" width="620" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="snAcaLbl" value="snet-aca &#160;&#183;&#160; 10.0.0.0/23 &#160;&#183;&#160; delegated Microsoft.App/environments" style="text;html=1;fontSize=14;fontStyle=1;align=left;verticalAlign=middle;fontColor=#2E6DA4;" vertex="1" parent="1">
+          <mxGeometry x="644" y="228" width="580" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="acaEnvBox" value="" style="rounded=1;arcSize=6;html=1;fillColor=#EAF3FB;strokeColor=#5B9BD5;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="646" y="262" width="568" height="366" as="geometry" />
+        </mxCell>
+        <mxCell id="acaEnvIcon" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/other/Container_App_Environments.svg;" vertex="1" parent="1">
+          <mxGeometry x="670" y="278" width="52" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="acaEnvLbl" value="Container Apps Environment &#8212; internal = true" style="text;html=1;fontSize=14;fontStyle=1;align=left;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="734" y="282" width="300" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="acaEnvSub" value="Workload profiles &#183; static internal IP" style="text;html=1;fontSize=12;align=left;verticalAlign=middle;fontColor=#5A6B7D;" vertex="1" parent="1">
+          <mxGeometry x="734" y="304" width="300" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="appBox" value="" style="rounded=1;arcSize=8;html=1;fillColor=#FFFFFF;strokeColor=#8AB6DC;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="666" y="352" width="210" height="252" as="geometry" />
+        </mxCell>
+        <mxCell id="appIcon" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/other/Worker_Container_App.svg;" vertex="1" parent="1">
+          <mxGeometry x="741" y="372" width="60" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="appLbl" value="Backend API" style="text;html=1;fontSize=14;fontStyle=1;align=center;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="670" y="436" width="202" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="appSub" value="Python FastAPI &#183; internal ingress" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#5A6B7D;" vertex="1" parent="1">
+          <mxGeometry x="670" y="456" width="202" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="appEps" value="GET&#160; /healthz&#10;GET&#160; /netcheck&#10;POST /ask" style="text;html=1;fontSize=12;align=left;verticalAlign=top;fontColor=#12263F;fontFamily=Courier New;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="676" y="486" width="190" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="appMi" value="User-assigned managed identity" style="text;html=1;fontSize=11;align=center;verticalAlign=middle;fontColor=#7A5C00;fillColor=#FFF6DA;strokeColor=#E8C55A;rounded=1;arcSize=40;" vertex="1" parent="1">
+          <mxGeometry x="672" y="556" width="198" height="26" as="geometry" />
+        </mxCell>
+
+        <mxCell id="jobBox" value="" style="rounded=1;arcSize=8;html=1;fillColor=#FFFFFF;strokeColor=#8AB6DC;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="968" y="352" width="222" height="252" as="geometry" />
+        </mxCell>
+        <mxCell id="jobIcon" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/other/Worker_Container_App.svg;" vertex="1" parent="1">
+          <mxGeometry x="1049" y="372" width="60" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="jobLbl" value="Smoke-test Job" style="text;html=1;fontSize=14;fontStyle=1;align=center;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="974" y="436" width="210" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="jobSub" value="Container Apps Job &#183; Manual trigger" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#5A6B7D;" vertex="1" parent="1">
+          <mxGeometry x="974" y="456" width="210" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="jobSteps" value="1&#160; DNS &#8594; must be 10.x&#10;2&#160; call backend (internal)&#10;3&#160; agent round trip" style="text;html=1;fontSize=12;align=left;verticalAlign=top;fontColor=#12263F;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="976" y="486" width="206" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="jobNote" value="The in-VNet test harness" style="text;html=1;fontSize=11;align=center;verticalAlign=middle;fontColor=#0B6A3A;fillColor=#E4F6EC;strokeColor=#57B685;rounded=1;arcSize=40;" vertex="1" parent="1">
+          <mxGeometry x="976" y="556" width="206" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- subnet: AGENT -->
+        <mxCell id="snAgent" value="" style="rounded=1;arcSize=4;html=1;fillColor=#FFFFFF;strokeColor=#8E63C4;strokeWidth=2;dashed=1;dashPattern=6 4;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="212" width="780" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="snAgentLbl" value="snet-agent &#160;&#183;&#160; 10.0.4.0/24 &#160;&#183;&#160; delegated Microsoft.App/environments &#160;&#183;&#160; dedicated to one Foundry resource" style="text;html=1;fontSize=14;fontStyle=1;align=left;verticalAlign=middle;fontColor=#6B3FA0;" vertex="1" parent="1">
+          <mxGeometry x="1324" y="228" width="740" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="injBox" value="" style="rounded=1;arcSize=6;html=1;fillColor=#F5EEFC;strokeColor=#8E63C4;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="1326" y="262" width="728" height="366" as="geometry" />
+        </mxCell>
+        <mxCell id="injHdr" value="NETWORK INJECTION &#8212; the agent runtime executes on your subnet" style="text;html=1;fontSize=13;fontStyle=1;align=left;verticalAlign=middle;fontColor=#6B3FA0;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="278" width="680" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="foundryBox" value="" style="rounded=1;arcSize=8;html=1;fillColor=#FFFFFF;strokeColor=#B08FD8;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="316" width="330" height="288" as="geometry" />
+        </mxCell>
+        <mxCell id="foundryIcon" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/ai_machine_learning/Cognitive_Services.svg;" vertex="1" parent="1">
+          <mxGeometry x="1481" y="336" width="68" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="foundryLbl" value="Azure AI Foundry account" style="text;html=1;fontSize=14;fontStyle=1;align=center;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="1360" y="392" width="310" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="foundrySub" value="kind = AIServices &#183; publicNetworkAccess = Disabled" style="text;html=1;fontSize=11;align=center;verticalAlign=middle;fontColor=#5A6B7D;" vertex="1" parent="1">
+          <mxGeometry x="1360" y="412" width="310" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="projBox" value="Foundry project&#10;+ gpt-4o-mini (GlobalStandard)" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#12263F;fillColor=#F0F6FC;strokeColor=#A9C7E4;rounded=1;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="440" width="290" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="capBox" value="Project capability host&#10;capabilityHostKind = Agents" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#7A5C00;fillColor=#FFF6DA;strokeColor=#E8C55A;rounded=1;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="494" width="290" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="smiBox" value="Project system-assigned identity" style="text;html=1;fontSize=11;align=center;verticalAlign=middle;fontColor=#0B6A3A;fillColor=#E4F6EC;strokeColor=#57B685;rounded=1;arcSize=40;" vertex="1" parent="1">
+          <mxGeometry x="1374" y="552" width="282" height="26" as="geometry" />
+        </mxCell>
+
+        <mxCell id="runtimeBox" value="" style="rounded=1;arcSize=8;html=1;fillColor=#FFFFFF;strokeColor=#B08FD8;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="1712" y="316" width="318" height="288" as="geometry" />
+        </mxCell>
+        <mxCell id="runtimeIcon" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/other/Container_App_Environments.svg;" vertex="1" parent="1">
+          <mxGeometry x="1845" y="336" width="52" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="runtimeLbl" value="Agent runtime compute" style="text;html=1;fontSize=14;fontStyle=1;align=center;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="1722" y="394" width="298" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="runtimeSub" value="Data proxy + micro VMs, injected into snet-agent" style="text;html=1;fontSize=11;align=center;verticalAlign=middle;fontColor=#5A6B7D;" vertex="1" parent="1">
+          <mxGeometry x="1722" y="414" width="298" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="runtimeNote" value="This is what Standard setup buys you:&#10;agent egress is governed by YOUR network,&#10;not by a Microsoft-managed one." style="text;html=1;fontSize=12;align=left;verticalAlign=top;fontColor=#6B3FA0;fillColor=#F5EEFC;strokeColor=#C4A6E4;rounded=1;arcSize=10;spacingLeft=10;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="1730" y="444" width="282" height="76" as="geometry" />
+        </mxCell>
+        <mxCell id="runtimeNote2" value="Threads &#8594; Cosmos &#160;&#183;&#160; Files &#8594; Storage&#10;Vectors &#8594; AI Search" style="text;html=1;fontSize=11;align=center;verticalAlign=middle;fontColor=#12263F;fillColor=#F0F6FC;strokeColor=#A9C7E4;rounded=1;arcSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1730" y="530" width="282" height="46" as="geometry" />
+        </mxCell>
+
+        <!-- subnet: PRIVATE ENDPOINTS -->
+        <mxCell id="snPe" value="" style="rounded=1;arcSize=4;html=1;fillColor=#FFFFFF;strokeColor=#1F9A7C;strokeWidth=2;dashed=1;dashPattern=6 4;" vertex="1" parent="1">
+          <mxGeometry x="620" y="700" width="1460" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="snPeLbl" value="snet-pe &#160;&#183;&#160; 10.0.8.0/26 &#160;&#183;&#160; no delegation &#160;&#183;&#160; Private Endpoints" style="text;html=1;fontSize=14;fontStyle=1;align=left;verticalAlign=middle;fontColor=#0F7A61;" vertex="1" parent="1">
+          <mxGeometry x="830" y="716" width="640" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pe1" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/networking/Private_Endpoint.svg;" vertex="1" parent="1">
+          <mxGeometry x="676" y="752" width="60" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="pe1l" value="pe-foundry" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="640" y="812" width="132" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="pe2" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/networking/Private_Endpoint.svg;" vertex="1" parent="1">
+          <mxGeometry x="946" y="752" width="60" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="pe2l" value="pe-cosmos" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="910" y="812" width="132" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="pe3" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/networking/Private_Endpoint.svg;" vertex="1" parent="1">
+          <mxGeometry x="1216" y="752" width="60" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="pe3l" value="pe-search" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="812" width="132" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="pe4" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/networking/Private_Endpoint.svg;" vertex="1" parent="1">
+          <mxGeometry x="1486" y="752" width="60" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="pe4l" value="pe-storage" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="1450" y="812" width="132" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="pe5" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/networking/Private_Endpoint.svg;" vertex="1" parent="1">
+          <mxGeometry x="1756" y="752" width="60" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="pe5l" value="pe-keyvault" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="1720" y="812" width="132" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="dnsBox" value="" style="rounded=1;arcSize=8;html=1;fillColor=#E9F7F3;strokeColor=#1F9A7C;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="646" y="862" width="1408" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="dnsIcon" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/networking/DNS_Zones.svg;" vertex="1" parent="1">
+          <mxGeometry x="676" y="884" width="56" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="dnsLbl" value="Private DNS zones &#8212; all linked to the VNet, so every FQDN below resolves to a 10.0.8.x address" style="text;html=1;fontSize=13;fontStyle=1;align=left;verticalAlign=middle;fontColor=#0F7A61;" vertex="1" parent="1">
+          <mxGeometry x="750" y="880" width="1000" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="dnsList1" value="privatelink.services.ai.azure.com&#10;privatelink.openai.azure.com&#10;privatelink.cognitiveservices.azure.com" style="text;html=1;fontSize=12;align=left;verticalAlign=top;fontColor=#12263F;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="750" y="908" width="340" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dnsList2" value="privatelink.documents.azure.com&#10;privatelink.search.windows.net&#10;privatelink.blob.core.windows.net" style="text;html=1;fontSize=12;align=left;verticalAlign=top;fontColor=#12263F;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="1116" y="908" width="330" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dnsList3" value="privatelink.vaultcore.azure.net&#10;&lt;env&gt;.koreacentral.azurecontainerapps.io&#10;&#160;&#160;&#8627; wildcard A record, built by Bicep" style="text;html=1;fontSize=12;align=left;verticalAlign=top;fontColor=#12263F;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="1472" y="908" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- backing services -->
+        <mxCell id="svcBox" value="" style="rounded=1;arcSize=4;html=1;fillColor=#FBFBFC;strokeColor=#9AA7B4;strokeWidth=2;dashed=1;dashPattern=6 4;" vertex="1" parent="1">
+          <mxGeometry x="620" y="1064" width="1460" height="214" as="geometry" />
+        </mxCell>
+        <mxCell id="svcLbl" value="BYO data plane &#8212; mandatory for Standard setup &#160;&#183;&#160; every one has publicNetworkAccess = Disabled" style="text;html=1;fontSize=14;fontStyle=1;align=left;verticalAlign=middle;fontColor=#5A6B7D;" vertex="1" parent="1">
+          <mxGeometry x="644" y="1242" width="900" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cos" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/databases/Azure_Cosmos_DB.svg;" vertex="1" parent="1">
+          <mxGeometry x="676" y="1120" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="cosl" value="Cosmos DB (NoSQL)&#10;serverless &#183; threads" style="text;html=1;fontSize=12;align=center;verticalAlign=top;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="636" y="1186" width="140" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="srch" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/app_services/Search_Services.svg;" vertex="1" parent="1">
+          <mxGeometry x="946" y="1126" width="68" height="49" as="geometry" />
+        </mxCell>
+        <mxCell id="srchl" value="AI Search (basic)&#10;vector store" style="text;html=1;fontSize=12;align=center;verticalAlign=top;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="910" y="1186" width="140" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/storage/Storage_Accounts.svg;" vertex="1" parent="1">
+          <mxGeometry x="1213" y="1124" width="65" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="stgl" value="Storage account&#10;agent files" style="text;html=1;fontSize=12;align=center;verticalAlign=top;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="1176" y="1186" width="140" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="kv" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/security/Key_Vaults.svg;" vertex="1" parent="1">
+          <mxGeometry x="1482" y="1116" width="68" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="kvl" value="Key Vault&#10;RBAC mode" style="text;html=1;fontSize=12;align=center;verticalAlign=top;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="1446" y="1186" width="140" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="acr" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/containers/Container_Registries.svg;" vertex="1" parent="1">
+          <mxGeometry x="1752" y="1120" width="68" height="61" as="geometry" />
+        </mxCell>
+        <mxCell id="acrl" value="Container Registry&#10;public + AcrPull via MI" style="text;html=1;fontSize=12;align=center;verticalAlign=top;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="1716" y="1186" width="140" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="law" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/analytics/Log_Analytics_Workspaces.svg;" vertex="1" parent="1">
+          <mxGeometry x="1954" y="1120" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="lawl" value="6&#160; Log Analytics&#10;job stdout &#8594; KQL" style="text;html=1;fontSize=12;align=center;verticalAlign=top;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="1914" y="1186" width="140" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ============ EDGES ============ -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D64550;strokeWidth=3;endArrow=block;endFill=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="gh" target="arm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1l" value="1&#160; start job" style="text;html=1;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;fontColor=#A32530;fillColor=#FBE3E4;strokeColor=#D64550;rounded=1;arcSize=40;" vertex="1" parent="1">
+          <mxGeometry x="216" y="228" width="92" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D64550;strokeWidth=3;endArrow=block;endFill=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.82;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="arm" target="jobBox">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="540" y="192" />
+              <mxPoint x="1150" y="192" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2l" value="2&#160; ARM control plane reaches into the VNet &#8212; the data plane never does" style="text;html=1;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;fontColor=#A32530;fillColor=#FBE3E4;strokeColor=#D64550;rounded=1;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="180" width="440" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0F7A61;strokeWidth=3;endArrow=block;endFill=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="jobBox" target="appBox">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3l" value="3" style="text;html=1;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;fontColor=#0B6A3A;fillColor=#E4F6EC;strokeColor=#57B685;rounded=1;arcSize=40;" vertex="1" parent="1">
+          <mxGeometry x="890" y="466" width="64" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0078D4;strokeWidth=4;endArrow=block;endFill=1;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="appBox" target="pe1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="697" y="722" />
+              <mxPoint x="706" y="722" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4l" value="4&#160; app &#8594; Foundry agent (private)" style="text;html=1;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;fontColor=#005A9E;fillColor=#DEEDFA;strokeColor=#0078D4;rounded=1;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="716" y="656" width="252" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0078D4;strokeWidth=4;endArrow=block;endFill=1;exitX=0.05;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;dashPattern=8 5;" edge="1" parent="1" source="foundryBox" target="pe1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1366" y="692" />
+              <mxPoint x="786" y="692" />
+              <mxPoint x="786" y="779" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5l" value="resolved via privatelink.services.ai.azure.com &#8594; 10.0.8.x" style="text;html=1;fontSize=12;align=center;verticalAlign=middle;fontColor=#005A9E;fillColor=#DEEDFA;strokeColor=#0078D4;rounded=1;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="974" y="656" width="356" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#8E63C4;strokeWidth=3;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;dashed=1;dashPattern=8 5;" edge="1" parent="1" source="runtimeBox" target="pe4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1871" y="720" />
+              <mxPoint x="1516" y="720" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6l" value="5&#160; agent &#8594; BYO data stores" style="text;html=1;fontSize=12;fontStyle=1;align=center;verticalAlign=middle;fontColor=#6B3FA0;fillColor=#F5EEFC;strokeColor=#8E63C4;rounded=1;arcSize=30;" vertex="1" parent="1">
+          <mxGeometry x="1596" y="656" width="230" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1F9A7C;strokeWidth=3;endArrow=block;endFill=1;exitX=0.09;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dnsBox" target="cos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="773" y="1040" />
+              <mxPoint x="706" y="1040" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1F9A7C;strokeWidth=3;endArrow=block;endFill=1;exitX=0.28;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dnsBox" target="srch">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1040" y="1040" />
+              <mxPoint x="980" y="1040" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1F9A7C;strokeWidth=3;endArrow=block;endFill=1;exitX=0.47;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dnsBox" target="stg">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1308" y="1040" />
+              <mxPoint x="1245" y="1040" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1F9A7C;strokeWidth=3;endArrow=block;endFill=1;exitX=0.66;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dnsBox" target="kv">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1575" y="1040" />
+              <mxPoint x="1516" y="1040" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="eBlock" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D64550;strokeWidth=3;endArrow=none;dashed=1;dashPattern=8 6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="blockBox" target="snPe">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eBlockX" value="&#10008;" style="text;html=1;fontSize=30;fontStyle=1;align=center;verticalAlign=middle;fontColor=#D64550;" vertex="1" parent="1">
+          <mxGeometry x="512" y="572" width="56" height="36" as="geometry" />
+        </mxCell>
+
+        <!-- ============ LEGEND ============ -->
+        <mxCell id="lgBox" value="" style="rounded=1;arcSize=6;html=1;fillColor=#FFFFFF;strokeColor=#C7D0D9;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="720" width="440" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="lgTitle" value="Verification flow" style="text;html=1;fontSize=15;fontStyle=1;align=left;verticalAlign=middle;fontColor=#12263F;" vertex="1" parent="1">
+          <mxGeometry x="84" y="738" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="lgBody" value="1&#160;&#160;Runner starts the Job through ARM (public)&#10;2&#160;&#160;Job executes INSIDE snet-aca&#10;3&#160;&#160;Job calls the backend on its internal FQDN&#10;4&#160;&#160;Backend calls the Foundry Agent via private endpoint&#10;5&#160;&#160;Agent reads/writes its BYO stores, all private&#10;6&#160;&#160;Exit code + Log Analytics report the verdict&#10;&#10;Negative control: the same probes run from the&#10;public runner and MUST fail. That failure is the&#10;evidence the isolation is real." style="text;html=1;fontSize=13;align=left;verticalAlign=top;fontColor=#12263F;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="84" y="768" width="400" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="lgKey" value="&#9473;&#9473; control plane (public) &#160;&#160;&#9473;&#9473; private data path &#160;&#160;&#9473;&#9473; DNS / PE &#160;&#160;&#9473;&#9473; injected runtime" style="text;html=1;fontSize=11;align=left;verticalAlign=middle;fontColor=#5A6B7D;" vertex="1" parent="1">
+          <mxGeometry x="84" y="1000" width="400" height="34" as="geometry" />
+        </mxCell>
+
+        <mxCell id="footer" value="Every dependency resolves to a private 10.0.8.x address from inside the VNet. Nothing in this diagram is reachable from the public internet except the ARM control plane." style="text;html=1;fontSize=14;align=left;verticalAlign=middle;fontColor=#5A6B7D;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1340" width="1600" height="26" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

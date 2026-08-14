@@ -1,0 +1,65 @@
+name: PR validate
+
+on:
+  pull_request:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mask Azure identifiers
+        shell: bash
+        run: |
+          echo "::add-mask::$AZURE_CLIENT_ID"
+          echo "::add-mask::$AZURE_TENANT_ID"
+          echo "::add-mask::$AZURE_SUBSCRIPTION_ID"
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+      - name: Build Bicep
+        run: az bicep build --file infra/main.bicep
+      - name: Run subscription what-if and scrub IDs
+        id: whatif
+        shell: bash
+        run: |
+          set +e
+          az deployment sub what-if \
+            --name "pr-${{ github.run_id }}" \
+            --location koreacentral \
+            --template-file infra/main.bicep \
+            --parameters infra/main.bicepparam \
+            --no-pretty-print > what-if.raw 2>&1
+          status=$?
+          perl -0pe 's/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/<guid-redacted>/g' what-if.raw > what-if.txt
+          head -c 60000 what-if.txt > what-if-comment.txt
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Comment what-if on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('what-if-comment.txt', 'utf8');
+            const status = '${{ steps.whatif.outputs.status }}';
+            const suffix = body.length >= 60000 ? '\n\n_Output truncated to fit the GitHub comment limit._' : '';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `### Azure deployment what-if (GUIDs scrubbed)\n\nExit code: ${status}\n\n\`\`\`text\n${body}${suffix}\n\`\`\``
+            });
+      - name: Fail if what-if failed
+        if: steps.whatif.outputs.status != '0'
+        run: exit 1

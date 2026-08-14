@@ -1,0 +1,73 @@
+name: Teardown
+
+on:
+  workflow_dispatch:
+    inputs:
+      resourceGroupName:
+        description: Type the resource group name to delete.
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      RESOURCE_GROUP: ${{ inputs.resourceGroupName }}
+    steps:
+      - name: Mask Azure identifiers
+        shell: bash
+        run: |
+          echo "::add-mask::$AZURE_CLIENT_ID"
+          echo "::add-mask::$AZURE_TENANT_ID"
+          echo "::add-mask::$AZURE_SUBSCRIPTION_ID"
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+      - name: Capture soft-delete resource names
+        shell: bash
+        run: |
+          az cognitiveservices account list -g "$RESOURCE_GROUP" --query "[?kind=='AIServices'].[name,location]" -o tsv > foundry.tsv || true
+          az keyvault list -g "$RESOURCE_GROUP" --query "[].[name,location]" -o tsv > keyvaults.tsv || true
+      - name: Delete project capability hosts first
+        shell: bash
+        run: |
+          ids=$(az resource list -g "$RESOURCE_GROUP" --resource-type "Microsoft.CognitiveServices/accounts/projects/capabilityHosts" --query "[].id" -o tsv || true)
+          if [ -z "$ids" ]; then
+            echo "No project capability hosts found."
+            exit 0
+          fi
+          while IFS= read -r id; do
+            [ -z "$id" ] && continue
+            echo "Deleting capability host $id"
+            az resource delete --ids "$id" --api-version 2025-12-01 || true
+          done <<< "$ids"
+      - name: Delete resource group
+        shell: bash
+        run: |
+          az group delete --name "$RESOURCE_GROUP" --yes --no-wait
+          az group wait --name "$RESOURCE_GROUP" --deleted
+      - name: Purge soft-deleted Foundry accounts and Key Vaults
+        shell: bash
+        run: |
+          if [ -s foundry.tsv ]; then
+            while IFS=$'\t' read -r name location; do
+              [ -z "$name" ] && continue
+              az cognitiveservices account purge --name "$name" --location "$location" || true
+            done < foundry.tsv
+          fi
+          if [ -s keyvaults.tsv ]; then
+            while IFS=$'\t' read -r name location; do
+              [ -z "$name" ] && continue
+              az keyvault purge --name "$name" --location "$location" || true
+            done < keyvaults.tsv
+          fi

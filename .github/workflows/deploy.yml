@@ -1,0 +1,200 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    outputs:
+      resource_group: ${{ steps.capture.outputs.resource_group }}
+      acr_name: ${{ steps.capture.outputs.acr_name }}
+      app_name: ${{ steps.capture.outputs.app_name }}
+      app_url: ${{ steps.capture.outputs.app_url }}
+      job_name: ${{ steps.capture.outputs.job_name }}
+      workspace_id: ${{ steps.capture.outputs.workspace_id }}
+      foundry_endpoint: ${{ steps.capture.outputs.foundry_endpoint }}
+      capability_host_id: ${{ steps.capture.outputs.capability_host_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mask Azure identifiers
+        shell: bash
+        run: |
+          echo "::add-mask::$AZURE_CLIENT_ID"
+          echo "::add-mask::$AZURE_TENANT_ID"
+          echo "::add-mask::$AZURE_SUBSCRIPTION_ID"
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+      - name: Build Bicep
+        run: az bicep build --file infra/main.bicep
+      - name: Deploy infrastructure with placeholder image
+        shell: bash
+        run: |
+          az deployment sub create \
+            --name "aca-foundry-private-${{ github.run_id }}-placeholder" \
+            --location koreacentral \
+            --template-file infra/main.bicep \
+            --parameters infra/main.bicepparam \
+            --parameters containerImage=mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+            --output json > deployment.json
+      - name: Capture deployment outputs
+        id: capture
+        shell: bash
+        run: |
+          echo "resource_group=$(jq -r '.properties.outputs.resourceGroupName.value' deployment.json)" >> "$GITHUB_OUTPUT"
+          echo "acr_name=$(jq -r '.properties.outputs.acrName.value' deployment.json)" >> "$GITHUB_OUTPUT"
+          echo "app_name=$(jq -r '.properties.outputs.containerAppName.value' deployment.json)" >> "$GITHUB_OUTPUT"
+          echo "app_url=$(jq -r '.properties.outputs.containerAppUrl.value' deployment.json)" >> "$GITHUB_OUTPUT"
+          echo "job_name=$(jq -r '.properties.outputs.verifyJobName.value' deployment.json)" >> "$GITHUB_OUTPUT"
+          echo "workspace_id=$(jq -r '.properties.outputs.logAnalyticsWorkspaceResourceId.value' deployment.json)" >> "$GITHUB_OUTPUT"
+          echo "foundry_endpoint=$(jq -r '.properties.outputs.foundryProjectEndpoint.value' deployment.json)" >> "$GITHUB_OUTPUT"
+          echo "capability_host_id=$(jq -r '.properties.outputs.foundryCapabilityHostResourceId.value' deployment.json)" >> "$GITHUB_OUTPUT"
+      - name: Build application image in ACR
+        shell: bash
+        run: |
+          IMAGE_TAG="private-agent:${{ github.sha }}"
+          echo "IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
+          az acr build \
+            --registry "${{ steps.capture.outputs.acr_name }}" \
+            --image "$IMAGE_TAG" \
+            --file src/Dockerfile \
+            src
+      - name: Redeploy with private ACR image
+        shell: bash
+        run: |
+          REAL_IMAGE="${{ steps.capture.outputs.acr_name }}.azurecr.io/$IMAGE_TAG"
+          az deployment sub create \
+            --name "aca-foundry-private-${{ github.run_id }}-image" \
+            --location koreacentral \
+            --template-file infra/main.bicep \
+            --parameters infra/main.bicepparam \
+            --parameters containerImage="$REAL_IMAGE" \
+            --output none
+      - name: Negative public reachability control
+        shell: bash
+        run: |
+          set +e
+          curl --connect-timeout 10 --max-time 20 --fail --silent --show-error "${{ steps.capture.outputs.foundry_endpoint }}" >/dev/null
+          foundry_status=$?
+          curl --connect-timeout 10 --max-time 20 --fail --silent --show-error "${{ steps.capture.outputs.app_url }}/healthz" >/dev/null
+          app_status=$?
+          set -e
+          if [ "$foundry_status" -eq 0 ]; then
+            echo "Foundry endpoint was unexpectedly reachable from the public runner."
+            exit 1
+          fi
+          if [ "$app_status" -eq 0 ]; then
+            echo "Container App was unexpectedly reachable from the public runner."
+            exit 1
+          fi
+          echo "Negative control passed: public runner could not reach private endpoints."
+      - name: Wait for control-plane and data-plane readiness signals
+        shell: bash
+        run: |
+          wait_for() {
+            local label="$1"
+            local attempts="$2"
+            local delay="$3"
+            local command="$4"
+            for i in $(seq 1 "$attempts"); do
+              if bash -c "$command"; then
+                echo "$label is ready."
+                return 0
+              fi
+              echo "Waiting for $label ($i/$attempts)..."
+              sleep "$delay"
+              delay=$(( delay < 60 ? delay + 10 : 60 ))
+            done
+            echo "Timed out waiting for $label."
+            return 1
+          }
+          capability_id='${{ steps.capture.outputs.capability_host_id }}'
+          project_scope="${capability_id%/capabilityHosts/agents}"
+          wait_for "RBAC propagation" 30 10 "az role assignment list --scope '$project_scope' --query 'length(@)' -o tsv >/dev/null"
+          wait_for "Foundry capability host" 40 15 "state=\$(az resource show --ids '$capability_id' --api-version 2025-12-01 --query properties.provisioningState -o tsv 2>/dev/null); [[ \"\$state\" == Succeeded || \"\$state\" == Ready ]]"
+          wait_for "Container Apps revision" 30 10 "count=\$(az containerapp revision list -g '${{ steps.capture.outputs.resource_group }}' -n '${{ steps.capture.outputs.app_name }}' --query \"[?properties.active].name | length(@)\" -o tsv 2>/dev/null); [[ \"\$count\" != '' && \"\$count\" -gt 0 ]]"
+
+  verify:
+    runs-on: ubuntu-latest
+    needs: deploy
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - name: Mask Azure identifiers
+        shell: bash
+        run: |
+          echo "::add-mask::$AZURE_CLIENT_ID"
+          echo "::add-mask::$AZURE_TENANT_ID"
+          echo "::add-mask::$AZURE_SUBSCRIPTION_ID"
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+      - name: Start Container Apps smoke-test job
+        id: start
+        shell: bash
+        run: |
+          execution_name=$(az containerapp job start \
+            --resource-group "${{ needs.deploy.outputs.resource_group }}" \
+            --name "${{ needs.deploy.outputs.job_name }}" \
+            --query name -o tsv)
+          echo "execution_name=$execution_name" >> "$GITHUB_OUTPUT"
+      - name: Poll job execution
+        id: poll
+        shell: bash
+        run: |
+          execution="${{ steps.start.outputs.execution_name }}"
+          status=""
+          for i in {1..80}; do
+            status=$(az containerapp job execution list \
+              --resource-group "${{ needs.deploy.outputs.resource_group }}" \
+              --name "${{ needs.deploy.outputs.job_name }}" \
+              --query "[?name=='$execution'].properties.status | [0]" -o tsv)
+            echo "Job execution $execution status: ${status:-unknown}"
+            if [[ "$status" != "" && "$status" != "Running" && "$status" != "Processing" ]]; then
+              break
+            fi
+            sleep 15
+          done
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+      - name: Fetch smoke-test logs from Log Analytics
+        shell: bash
+        run: |
+          execution="${{ steps.start.outputs.execution_name }}"
+          query="ContainerAppConsoleLogs_CL | where TimeGenerated > ago(2h) | where ContainerGroupName_s has '$execution' or ContainerAppName_s == '${{ needs.deploy.outputs.job_name }}' | order by TimeGenerated asc | project TimeGenerated, Log_s"
+          for i in {1..20}; do
+            az monitor log-analytics query \
+              --workspace "${{ needs.deploy.outputs.workspace_id }}" \
+              --analytics-query "$query" \
+              --output table > smoke-logs.txt 2>/dev/null || true
+            if [ -s smoke-logs.txt ]; then
+              cat smoke-logs.txt
+              exit 0
+            fi
+            echo "Waiting for Log Analytics ingestion ($i/20)..."
+            sleep 20
+          done
+          echo "No smoke-test logs were available before timeout."
+      - name: Fail on unsuccessful job execution
+        if: steps.poll.outputs.status != 'Succeeded'
+        run: |
+          echo "Smoke-test job ended with status '${{ steps.poll.outputs.status }}'."
+          exit 1
