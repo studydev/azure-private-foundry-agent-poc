@@ -9,6 +9,9 @@ param cosmosName string
 param storageName string
 param searchName string
 
+@description('When false, the project runs Basic setup: no BYO connections and no capability host.')
+param enableAgentStandardSetup bool = false
+
 var acrId = resourceId('Microsoft.ContainerRegistry/registries', acrName)
 var foundryId = resourceId('Microsoft.CognitiveServices/accounts', foundryName)
 var projectId = '${foundryId}/projects/${projectName}'
@@ -90,7 +93,7 @@ resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-12-01' = 
   }
 }
 
-resource projectCosmosOperatorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource projectCosmosOperatorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableAgentStandardSetup) {
   name: guid(cosmosId, projectName, cosmosDbOperatorRoleId)
   scope: cosmosRef
   properties: {
@@ -100,7 +103,7 @@ resource projectCosmosOperatorAssignment 'Microsoft.Authorization/roleAssignment
   }
 }
 
-resource projectStorageContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource projectStorageContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableAgentStandardSetup) {
   name: guid(storageId, projectName, storageAccountContributorRoleId)
   scope: storageRef
   properties: {
@@ -110,7 +113,7 @@ resource projectStorageContributorAssignment 'Microsoft.Authorization/roleAssign
   }
 }
 
-resource projectSearchIndexDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource projectSearchIndexDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableAgentStandardSetup) {
   name: guid(searchId, projectName, searchIndexDataContributorRoleId)
   scope: searchRef
   properties: {
@@ -120,7 +123,7 @@ resource projectSearchIndexDataContributorAssignment 'Microsoft.Authorization/ro
   }
 }
 
-resource projectSearchServiceContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource projectSearchServiceContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableAgentStandardSetup) {
   name: guid(searchId, projectName, searchServiceContributorRoleId)
   scope: searchRef
   properties: {
@@ -134,7 +137,7 @@ var cosmosConnectionName = 'conn-cosmos'
 var storageConnectionName = 'conn-storage'
 var searchConnectionName = 'conn-search'
 
-resource cosmosConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-12-01' = {
+resource cosmosConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-12-01' = if (enableAgentStandardSetup) {
   name: '${foundryName}/${projectName}/${cosmosConnectionName}'
   properties: {
     authType: 'AAD'
@@ -150,7 +153,7 @@ resource cosmosConnection 'Microsoft.CognitiveServices/accounts/projects/connect
   ]
 }
 
-resource storageConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-12-01' = {
+resource storageConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-12-01' = if (enableAgentStandardSetup) {
   name: '${foundryName}/${projectName}/${storageConnectionName}'
   properties: {
     authType: 'AAD'
@@ -166,7 +169,7 @@ resource storageConnection 'Microsoft.CognitiveServices/accounts/projects/connec
   ]
 }
 
-resource searchConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-12-01' = {
+resource searchConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-12-01' = if (enableAgentStandardSetup) {
   name: '${foundryName}/${projectName}/${searchConnectionName}'
   properties: {
     authType: 'AAD'
@@ -183,7 +186,7 @@ resource searchConnection 'Microsoft.CognitiveServices/accounts/projects/connect
 }
 
 // Do not declare an account-level capability host: when networkInjections is set, the platform auto-provisions it and a user declaration can race the platform.
-resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-12-01' = {
+resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-12-01' = if (enableAgentStandardSetup) {
   name: '${foundryName}/${projectName}/agents'
   properties: {
     capabilityHostKind: 'Agents'
@@ -211,4 +214,4 @@ resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/ca
   ]
 }
 
-output capabilityHostResourceId string = '${projectId}/capabilityHosts/agents'
+output capabilityHostResourceId string = enableAgentStandardSetup ? '${projectId}/capabilityHosts/agents' : ''

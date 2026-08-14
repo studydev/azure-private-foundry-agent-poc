@@ -13,13 +13,27 @@ param baseName string = 'afapoc'
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
 @description('Model deployment name used by the sample app.')
-param modelDeploymentName string = 'gpt-4o-mini'
+param modelDeploymentName string = 'gpt-4.1-mini'
 
 @description('Optional tags applied to supported resources.')
 param tags object = {
   scenario: 'aca-foundry-private-agent-poc'
   purpose: 'public-proof-of-concept'
 }
+
+@description('''
+Selects the network isolation model for the Foundry Agent Service.
+
+false (default) - Basic setup with inbound private isolation. The Foundry account has
+publicNetworkAccess disabled and is reachable only through a private endpoint in the VNet.
+Thread and file storage are Microsoft-managed, so no Cosmos DB, AI Search or Key Vault is
+deployed. Fast to deploy and inexpensive.
+
+true - Standard setup with network injection. The agent runtime is injected into a delegated
+subnet in this VNet and brings your own Cosmos DB, AI Search and Storage, wired through a
+project capability host. Significantly more expensive and much slower to provision.
+''')
+param enableAgentStandardSetup bool = false
 
 var uniqueSuffix = uniqueString(subscription().id, resourceGroupName, baseName)
 var cleanBaseName = toLower(replace(baseName, '-', ''))
@@ -41,20 +55,20 @@ var storageName = take('st${cleanBaseName}${uniqueSuffix}', 24)
 var searchName = take('srch-${baseName}-${uniqueSuffix}', 60)
 var keyVaultName = take('kv-${baseName}-${uniqueSuffix}', 24)
 
-var vnetId = resourceId(resourceGroupName, 'Microsoft.Network/virtualNetworks', vnetName)
+var vnetId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Network/virtualNetworks', vnetName)
 var subnetAcaId = '${vnetId}/subnets/snet-aca'
 var subnetAgentId = '${vnetId}/subnets/snet-agent'
 var subnetPeId = '${vnetId}/subnets/snet-pe'
-var nsgId = resourceId(resourceGroupName, 'Microsoft.Network/networkSecurityGroups', nsgName)
-var logAnalyticsResourceId = resourceId(resourceGroupName, 'Microsoft.OperationalInsights/workspaces', logAnalyticsName)
-var appIdentityId = resourceId(resourceGroupName, 'Microsoft.ManagedIdentity/userAssignedIdentities', appIdentityName)
-var foundryId = resourceId(resourceGroupName, 'Microsoft.CognitiveServices/accounts', foundryName)
+var nsgId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Network/networkSecurityGroups', nsgName)
+var logAnalyticsResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.OperationalInsights/workspaces', logAnalyticsName)
+var appIdentityId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.ManagedIdentity/userAssignedIdentities', appIdentityName)
+var foundryId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.CognitiveServices/accounts', foundryName)
 var projectId = '${foundryId}/projects/${projectName}'
-var cosmosId = resourceId(resourceGroupName, 'Microsoft.DocumentDB/databaseAccounts', cosmosName)
-var storageId = resourceId(resourceGroupName, 'Microsoft.Storage/storageAccounts', storageName)
-var searchId = resourceId(resourceGroupName, 'Microsoft.Search/searchServices', searchName)
-var keyVaultId = resourceId(resourceGroupName, 'Microsoft.KeyVault/vaults', keyVaultName)
-var acaEnvId = resourceId(resourceGroupName, 'Microsoft.App/managedEnvironments', acaEnvName)
+var cosmosId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.DocumentDB/databaseAccounts', cosmosName)
+var storageId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Storage/storageAccounts', storageName)
+var searchId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Search/searchServices', searchName)
+var keyVaultId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.KeyVault/vaults', keyVaultName)
+var acaEnvId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.App/managedEnvironments', acaEnvName)
 var foundryProjectEndpoint = 'https://${foundryName}.services.ai.azure.com/api/projects/${projectName}'
 
 var privateDnsZoneNames = [
@@ -67,13 +81,13 @@ var privateDnsZoneNames = [
   'privatelink.vaultcore.azure.net'
 ]
 
-var serviceAiDnsZoneId = resourceId(resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.services.ai.azure.com')
-var openAiDnsZoneId = resourceId(resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')
-var cognitiveDnsZoneId = resourceId(resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.cognitiveservices.azure.com')
-var cosmosDnsZoneId = resourceId(resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')
-var searchDnsZoneId = resourceId(resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.search.windows.net')
-var blobDnsZoneId = resourceId(resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.blob.core.windows.net')
-var vaultDnsZoneId = resourceId(resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.vaultcore.azure.net')
+var serviceAiDnsZoneId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.services.ai.azure.com')
+var openAiDnsZoneId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')
+var cognitiveDnsZoneId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.cognitiveservices.azure.com')
+var cosmosDnsZoneId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')
+var searchDnsZoneId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.search.windows.net')
+var blobDnsZoneId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.blob.core.windows.net')
+var vaultDnsZoneId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.vaultcore.azure.net')
 
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
@@ -178,11 +192,14 @@ module acr 'br/public:avm/res/container-registry/registry:0.12.1' = {
     acrSku: 'Basic'
     acrAdminUserEnabled: false
     publicNetworkAccess: 'Enabled'
+    // Basic SKU registries reject networkRuleSet. AVM writes one whenever public access is
+    // Enabled and the default action is Deny, so the action must be Allow on Basic.
+    networkRuleSetDefaultAction: 'Allow'
     tags: tags
   }
 }
 
-module keyVault 'br/public:avm/res/key-vault/vault:0.14.0' = {
+module keyVault 'br/public:avm/res/key-vault/vault:0.14.0' = if (enableAgentStandardSetup) {
   name: 'kv-${uniqueSuffix}'
   scope: rg
   params: {
@@ -200,7 +217,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.14.0' = {
   }
 }
 
-module storage 'br/public:avm/res/storage/storage-account:0.33.0' = {
+module storage 'br/public:avm/res/storage/storage-account:0.33.0' = if (enableAgentStandardSetup) {
   name: 'st-${uniqueSuffix}'
   scope: rg
   params: {
@@ -219,7 +236,7 @@ module storage 'br/public:avm/res/storage/storage-account:0.33.0' = {
   }
 }
 
-module cosmos 'br/public:avm/res/document-db/database-account:0.21.1' = {
+module cosmos 'br/public:avm/res/document-db/database-account:0.21.1' = if (enableAgentStandardSetup) {
   name: 'cosmos-${uniqueSuffix}'
   scope: rg
   params: {
@@ -249,7 +266,7 @@ module cosmos 'br/public:avm/res/document-db/database-account:0.21.1' = {
   }
 }
 
-module search 'br/public:avm/res/search/search-service:0.13.0' = {
+module search 'br/public:avm/res/search/search-service:0.13.0' = if (enableAgentStandardSetup) {
   name: 'search-${uniqueSuffix}'
   scope: rg
   params: {
@@ -284,8 +301,8 @@ module foundry 'br/public:avm/res/cognitive-services/account:0.19.0' = {
         name: modelDeploymentName
         model: {
           format: 'OpenAI'
-          name: 'gpt-4o-mini'
-          version: '2024-07-18'
+          name: 'gpt-4.1-mini'
+          version: '2025-04-14'
         }
         sku: {
           name: 'GlobalStandard'
@@ -294,65 +311,61 @@ module foundry 'br/public:avm/res/cognitive-services/account:0.19.0' = {
       }
     ]
     disableLocalAuth: true
-    // networkInjections is ahead of some published schemas and is required at creation time for private Foundry Agent Service network injection.
+    // networkInjections is ahead of some published schemas and is required at creation time for
+    // private Foundry Agent Service network injection. It can never be added to an existing account.
     #disable-next-line BCP036
-    networkInjections: {
-      scenario: 'agent'
-      subnetResourceId: subnetAgentId
-      useMicrosoftManagedNetwork: false
-    }
+    networkInjections: enableAgentStandardSetup
+      ? {
+          scenario: 'agent'
+          subnetResourceId: subnetAgentId
+          useMicrosoftManagedNetwork: false
+        }
+      : null
     publicNetworkAccess: 'Disabled'
+    // Required alongside publicNetworkAccess Disabled. Without bypass AzureServices the platform's
+    // own provisioning agents cannot reach the account while it builds the injected agent
+    // infrastructure, and the account hangs in 'Creating' indefinitely with no error surfaced.
+    networkAcls: {
+      defaultAction: 'Allow'
+      bypass: 'AzureServices'
+    }
+    // The private endpoint MUST be created by this same module invocation, not as a separate
+    // module that dependsOn it. With publicNetworkAccess Disabled and network injection enabled,
+    // the account stays in 'Creating' until its data plane is privately reachable; a downstream
+    // private endpoint module would wait on the account and deadlock the deployment.
+    privateEndpoints: [
+      {
+        name: 'pe-${foundryName}'
+        subnetResourceId: subnetPeId
+        privateDnsZoneGroup: {
+          name: 'default'
+          privateDnsZoneGroupConfigs: [
+            {
+              name: 'services-ai'
+              privateDnsZoneResourceId: serviceAiDnsZoneId
+            }
+            {
+              name: 'openai'
+              privateDnsZoneResourceId: openAiDnsZoneId
+            }
+            {
+              name: 'cognitive'
+              privateDnsZoneResourceId: cognitiveDnsZoneId
+            }
+          ]
+        }
+        tags: tags
+      }
+    ]
     tags: tags
   }
   dependsOn: [
     vnet
-  ]
-}
-
-module foundryPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1' = {
-  name: 'pe-foundry-${uniqueSuffix}'
-  scope: rg
-  params: {
-    name: 'pe-${foundryName}'
-    location: location
-    subnetResourceId: subnetPeId
-    privateLinkServiceConnections: [
-      {
-        name: 'pe-${foundryName}'
-        properties: {
-          groupIds: [
-            'account'
-          ]
-          privateLinkServiceId: foundryId
-        }
-      }
-    ]
-    privateDnsZoneGroup: {
-      name: 'default'
-      privateDnsZoneGroupConfigs: [
-        {
-          name: 'services-ai'
-          privateDnsZoneResourceId: serviceAiDnsZoneId
-        }
-        {
-          name: 'openai'
-          privateDnsZoneResourceId: openAiDnsZoneId
-        }
-        {
-          name: 'cognitive'
-          privateDnsZoneResourceId: cognitiveDnsZoneId
-        }
-      ]
-    }
-    tags: tags
-  }
-  dependsOn: [
-    foundry
     dnsZones
   ]
 }
 
-module cosmosPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1' = {
+module cosmosPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1' = if (enableAgentStandardSetup) {
   name: 'pe-cosmos-${uniqueSuffix}'
   scope: rg
   params: {
@@ -387,7 +400,7 @@ module cosmosPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1'
   ]
 }
 
-module searchPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1' = {
+module searchPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1' = if (enableAgentStandardSetup) {
   name: 'pe-search-${uniqueSuffix}'
   scope: rg
   params: {
@@ -422,7 +435,7 @@ module searchPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1'
   ]
 }
 
-module storagePrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1' = {
+module storagePrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1' = if (enableAgentStandardSetup) {
   name: 'pe-storage-${uniqueSuffix}'
   scope: rg
   params: {
@@ -457,7 +470,7 @@ module storagePrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1
   ]
 }
 
-module keyVaultPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1' = {
+module keyVaultPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.1' = if (enableAgentStandardSetup) {
   name: 'pe-kv-${uniqueSuffix}'
   scope: rg
   params: {
@@ -505,8 +518,10 @@ module acaEnv 'br/public:avm/res/app/managed-environment:0.15.0' = {
     infrastructureResourceGroupName: acaInfraRgName
     infrastructureSubnetResourceId: subnetAcaId
     internal: true
-    platformReservedCidr: '10.0.2.0/24'
-    platformReservedDnsIP: '10.0.2.10'
+    // Do NOT set platformReservedCidr / platformReservedDnsIP here. They are Consumption-only
+    // settings, are rejected on a workload-profiles environment, and when present in this VNet
+    // they break Foundry Agent Service network injection: the Foundry account then hangs in
+    // 'Creating' indefinitely with no error surfaced.
     publicNetworkAccess: 'Disabled'
     workloadProfiles: [
       {
@@ -523,16 +538,15 @@ module acaEnv 'br/public:avm/res/app/managed-environment:0.15.0' = {
   ]
 }
 
-resource acaEnvRef 'Microsoft.App/managedEnvironments@2025-10-02-preview' existing = {
-  name: acaEnvName
-  scope: rg
-}
-
+// The Container Apps environment's default domain and static IP are read from the module outputs.
+// An 'existing' reference cannot be used here: at subscription target scope ARM resolves existing
+// references eagerly, independently of a module's dependsOn, so it would be read before the
+// environment exists and fail with ResourceNotFound.
 module acaPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.1' = {
   name: 'pdz-aca-${uniqueSuffix}'
   scope: rg
   params: {
-    name: acaEnvRef.properties.defaultDomain
+    name: acaEnv.outputs.defaultDomain
     location: 'global'
     a: [
       {
@@ -540,7 +554,7 @@ module acaPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.1' = {
         ttl: 300
         aRecords: [
           {
-            ipv4Address: acaEnvRef.properties.staticIp
+            ipv4Address: acaEnv.outputs.staticIp!
           }
         ]
       }
@@ -549,7 +563,7 @@ module acaPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.1' = {
         ttl: 300
         aRecords: [
           {
-            ipv4Address: acaEnvRef.properties.staticIp
+            ipv4Address: acaEnv.outputs.staticIp!
           }
         ]
       }
@@ -581,12 +595,12 @@ module foundryProject './foundry-project.bicep' = {
     cosmosName: cosmosName
     storageName: storageName
     searchName: searchName
+    enableAgentStandardSetup: enableAgentStandardSetup
   }
   dependsOn: [
     appIdentity
     acr
     foundry
-    foundryPrivateEndpoint
     cosmos
     cosmosPrivateEndpoint
     storage
@@ -595,32 +609,47 @@ module foundryProject './foundry-project.bicep' = {
     searchPrivateEndpoint
   ]
 }
-var appEnv = [
-  {
-    name: 'PROJECT_ENDPOINT'
-    value: foundryProjectEndpoint
-  }
-  {
-    name: 'MODEL_DEPLOYMENT_NAME'
-    value: modelDeploymentName
-  }
-  {
-    name: 'FOUNDRY_FQDN'
-    value: '${foundryName}.services.ai.azure.com'
-  }
-  {
-    name: 'COSMOS_FQDN'
-    value: '${cosmosName}.documents.azure.com'
-  }
-  {
-    name: 'SEARCH_FQDN'
-    value: '${searchName}.search.windows.net'
-  }
-  {
-    name: 'STORAGE_FQDN'
-    value: '${storageName}.blob.core.windows.net'
-  }
-]
+// Only advertise the FQDNs that actually have a private endpoint in this configuration.
+// In Basic setup there is no BYO Cosmos / AI Search / Storage, so those names would resolve
+// publicly and the private-DNS assertion would correctly fail.
+var appEnv = concat(
+  [
+    {
+      name: 'PROJECT_ENDPOINT'
+      value: foundryProjectEndpoint
+    }
+    {
+      name: 'MODEL_DEPLOYMENT_NAME'
+      value: modelDeploymentName
+    }
+    {
+      name: 'FOUNDRY_FQDN'
+      value: '${foundryName}.services.ai.azure.com'
+    }
+    {
+      // DefaultAzureCredential requests the SYSTEM-assigned identity unless it is told which
+      // user-assigned client id to use. Without this the agent call fails to authenticate.
+      name: 'AZURE_CLIENT_ID'
+      value: appIdentity.outputs.clientId
+    }
+  ],
+  enableAgentStandardSetup
+    ? [
+        {
+          name: 'COSMOS_FQDN'
+          value: '${cosmosName}.documents.azure.com'
+        }
+        {
+          name: 'SEARCH_FQDN'
+          value: '${searchName}.search.windows.net'
+        }
+        {
+          name: 'STORAGE_FQDN'
+          value: '${storageName}.blob.core.windows.net'
+        }
+      ]
+    : []
+)
 
 module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
   name: 'app-${uniqueSuffix}'
@@ -707,7 +736,7 @@ module verifyJob 'br/public:avm/res/app/job:0.7.2' = {
         env: union(appEnv, [
           {
             name: 'BACKEND_URL'
-            value: 'https://${containerAppName}.${acaEnvRef.properties.defaultDomain}'
+            value: 'https://${containerApp.outputs.fqdn}'
           }
         ])
         resources: {
@@ -730,8 +759,8 @@ output acrName string = acrName
 output acrLoginServer string = '${acrName}.azurecr.io'
 output containerImage string = containerImage
 output containerAppName string = containerAppName
-output containerAppFqdn string = '${containerAppName}.${acaEnvRef.properties.defaultDomain}'
-output containerAppUrl string = 'https://${containerAppName}.${acaEnvRef.properties.defaultDomain}'
+output containerAppFqdn string = containerApp.outputs.fqdn
+output containerAppUrl string = 'https://${containerApp.outputs.fqdn}'
 output verifyJobName string = verifyJobName
 output logAnalyticsWorkspaceResourceId string = logAnalyticsResourceId
 output foundryAccountName string = foundryName

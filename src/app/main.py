@@ -1,6 +1,7 @@
 import ipaddress
 import os
 import socket
+import threading
 from typing import Any
 
 from azure.ai.agents import AgentsClient
@@ -42,19 +43,23 @@ def netcheck_payload() -> dict[str, Any]:
     for name, env_name in FQDN_ENV.items():
         fqdn = os.getenv(env_name)
         if not fqdn:
-            failures.append(f"{env_name} is not set")
-            checks[name] = {"fqdn": None, "ips": [], "allPrivate": False}
+            # Not every configuration has every dependency. Basic setup has no BYO Cosmos,
+            # AI Search or Storage, so an unset FQDN is "not applicable", not a failure.
+            checks[name] = {"fqdn": None, "ips": [], "allPrivate": None, "skipped": True}
             continue
         try:
             ips = resolve_fqdn(fqdn)
             all_private = all(is_rfc1918(ip) for ip in ips)
             if not all_private:
                 failures.append(f"{fqdn} resolved to at least one non-RFC1918 address: {ips}")
-            checks[name] = {"fqdn": fqdn, "ips": ips, "allPrivate": all_private}
+            checks[name] = {"fqdn": fqdn, "ips": ips, "allPrivate": all_private, "skipped": False}
         except Exception as exc:
             failures.append(f"{fqdn} resolution failed: {exc}")
-            checks[name] = {"fqdn": fqdn, "ips": [], "allPrivate": False, "error": str(exc)}
-    return {"ok": not failures, "checks": checks, "failures": failures}
+            checks[name] = {"fqdn": fqdn, "ips": [], "allPrivate": False, "skipped": False, "error": str(exc)}
+    checked = [name for name, check in checks.items() if not check["skipped"]]
+    if not checked:
+        failures.append("No dependency FQDNs were configured, so private DNS could not be asserted")
+    return {"ok": not failures, "checks": checks, "checked": checked, "failures": failures}
 
 
 def text_from_message(message: Any) -> str | None:
@@ -69,6 +74,47 @@ def text_from_message(message: Any) -> str | None:
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+def run_selftest() -> None:
+    """Run the isolation checks once at startup and print the result to stdout.
+
+    Container Apps console logs are readable through the ARM control plane
+    (`az containerapp logs show`) even when the environment has no public ingress,
+    so this is the most reliable way to surface verification evidence from a
+    fully private environment.
+    """
+    print("\n========== PRIVATE NETWORK SELFTEST ==========", flush=True)
+    payload = netcheck_payload()
+    for name, check in payload["checks"].items():
+        if check.get("skipped"):
+            print(f"DNS  {name:<9} not applicable in this configuration", flush=True)
+            continue
+        print(f"DNS  {name:<9} {check.get('fqdn')} -> {check.get('ips')} private={check.get('allPrivate')}", flush=True)
+    if not payload["ok"]:
+        for failure in payload["failures"]:
+            print(f"DNS  FAILURE  {failure}", flush=True)
+
+    agent_ok = False
+    agent_detail = ""
+    try:
+        result = ask(AskRequest(question="Reply with exactly: PRIVATE_AGENT_PASS"))
+        agent_detail = result.reply.strip()
+        agent_ok = bool(agent_detail)
+    except Exception as exc:  # noqa: BLE001 - selftest must never crash startup
+        agent_detail = f"{type(exc).__name__}: {exc}"
+
+    print(f"AGENT round trip ok={agent_ok} reply={agent_detail!r}", flush=True)
+    verdict = "PASS" if payload["ok"] and agent_ok else "FAIL"
+    print(f"SELFTEST {verdict}", flush=True)
+    print("==============================================\n", flush=True)
+
+
+@app.on_event("startup")
+def _startup_selftest() -> None:
+    if os.getenv("RUN_SELFTEST", "true").lower() not in ("1", "true", "yes"):
+        return
+    threading.Thread(target=run_selftest, name="selftest", daemon=True).start()
 
 
 @app.get("/netcheck")

@@ -1,6 +1,6 @@
 # Azure private Foundry Agent PoC
 
-This proof of concept deploys an Azure Container Apps backend and Azure AI Foundry Agent Service into the same isolated Azure Virtual Network. It demonstrates private connectivity only: the Container Apps environment is internal, Foundry uses standard setup with private networking and network injection, and verification runs from inside the VNet.
+This proof of concept deploys an Azure Container Apps backend and Azure AI Foundry Agent Service into the same isolated Azure Virtual Network. The default path is the Basic Foundry Agent setup with inbound private isolation; it was deployed, tested, and verified end to end. The template can also opt into Standard setup with network injection for teams that need bring-your-own backing services.
 
 ## Contents
 
@@ -12,6 +12,7 @@ This proof of concept deploys an Azure Container Apps backend and Azure AI Found
 - [Set up the CI/CD pipeline](#set-up-the-cicd-pipeline)
 - [Verify](#verify)
 - [Cost](#cost)
+- [Implementation notes](#implementation-notes)
 - [Teardown](#teardown)
 - [Known issues and gotchas](#known-issues-and-gotchas)
 - [License](#license)
@@ -26,33 +27,31 @@ This proof of concept deploys an Azure Container Apps backend and Azure AI Found
 
 ## How the isolation works
 
+`enableAgentStandardSetup` selects the Foundry Agent isolation model. It defaults to `false`.
+
+| Model | Parameter | What runs where | What is deployed | Approximate cost | Provisioning | Status |
+| --- | --- | --- | --- | ---: | --- | --- |
+| **Basic setup + inbound private isolation** | `enableAgentStandardSetup=false` | Foundry account data plane is private via private endpoint. Agent runtime, thread storage, and file storage are Microsoft-managed. Container Apps runs in an internal managed environment in the VNet. | Foundry account/project, Foundry private endpoint and DNS, internal Container Apps environment/app/job, ACR, managed identity, role assignments, Log Analytics. **No Cosmos DB, AI Search, Key Vault, or dependency private endpoints.** | **~$25–40/month** | About 7 minutes observed | **Default and verified end to end** |
+| **Standard setup with network injection** | `enableAgentStandardSetup=true` | Foundry Agent runtime is injected into `snet-agent`. Thread/vector/file storage use BYO Cosmos DB, AI Search, and Storage through a project capability host. | Everything in Basic, plus Cosmos DB, AI Search, Storage, Key Vault, dependency private endpoints, project connections, and an `Agents` capability host. | **~$135–160/month** | Can take much longer; see [Known issues and gotchas](#known-issues-and-gotchas) | Available, but validate before relying on it |
+
 The deployment creates a single VNet (`10.0.0.0/16`) with three subnets:
 
 | Subnet | CIDR | Purpose | Delegation |
 | --- | --- | --- | --- |
 | `snet-aca` | `10.0.0.0/23` | Internal Azure Container Apps environment | `Microsoft.App/environments` |
-| `snet-agent` | `10.0.4.0/24` | Foundry Agent Service network injection | `Microsoft.App/environments` |
+| `snet-agent` | `10.0.4.0/24` | Foundry Agent network injection when Standard setup is enabled | `Microsoft.App/environments` |
 | `snet-pe` | `10.0.8.0/26` | Private endpoints | none |
 
-The Foundry account is created with `publicNetworkAccess: Disabled`, `disableLocalAuth: true`, and `networkInjections` pointing at `snet-agent`. Network injection must be present when the Foundry account is created; it is effectively a creation-time choice for this PoC. The Bicep keeps the `networkInjections` property in the Foundry account module call and documents why the schema warning is suppressed.
+In both models, the Foundry account is created with `publicNetworkAccess: 'Disabled'` and `disableLocalAuth: true`. In Basic setup, private ingress is the isolation boundary: the public data plane returns HTTP 403 even with a valid Entra token, while VNet clients resolve the Foundry FQDN to the private endpoint IP.
 
-Private endpoints are created for Foundry, Cosmos DB, AI Search, Storage Blob, and Key Vault. The VNet links to these private DNS zones:
+In Standard setup, `networkInjections` is added at Foundry account creation time and points to `snet-agent`. That setting is effectively a creation-time choice for this PoC.
 
-- `privatelink.services.ai.azure.com`
-- `privatelink.openai.azure.com`
-- `privatelink.cognitiveservices.azure.com`
-- `privatelink.documents.azure.com`
-- `privatelink.search.windows.net`
-- `privatelink.blob.core.windows.net`
-- `privatelink.vaultcore.azure.net`
-
-Container Apps internal ingress also needs DNS. Azure does not automatically create a private zone for the managed environment default domain, so the template creates a zone named after that default domain and adds apex (`@`) and wildcard (`*`) A records to the environment static IP.
-
-AI Search, Cosmos DB, and Storage are mandatory in this design because the project capability host declares `vectorStoreConnections`, `threadStorageConnections`, and `storageConnections` unconditionally. The template creates project connections for all three before creating the project-level `Agents` capability host.
+Container Apps internal ingress also needs DNS. Azure does not automatically create a private zone for the managed environment default domain, so the template creates a zone named after that default domain and adds apex (`@`) and wildcard (`*`) A records to the environment static IP. An internal Container Apps app resolves as `<app>.internal.<defaultDomain>`; use the container app module's `fqdn` output rather than building the FQDN by hand.
 
 ## Prerequisites
 
-- Azure subscription with access to Azure Container Apps, Azure AI Foundry, Azure AI Search, Azure Cosmos DB, Azure Container Registry, Storage, Key Vault, and private endpoints in the target region.
+- Azure subscription with access to Azure Container Apps, Azure AI Foundry, Azure Container Registry, private endpoints, managed identities, and role assignments in the target region.
+- If `enableAgentStandardSetup=true`, also ensure access to Azure AI Search, Azure Cosmos DB, Storage, and Key Vault.
 - Azure CLI with the Bicep extension.
 - GitHub CLI.
 - Docker is not required locally when you use `az acr build`.
@@ -68,7 +67,7 @@ AI Search, Cosmos DB, and Storage are mandatory in this design because the proje
    az account set --subscription "<your-subscription-id>"
    ```
 
-3. Deploy the infrastructure with the placeholder image:
+3. Deploy the infrastructure with the placeholder image. This uses the default Basic setup unless you append `enableAgentStandardSetup=true`.
 
    ```bash
    az deployment sub create \
@@ -83,6 +82,8 @@ AI Search, Cosmos DB, and Storage are mandatory in this design because the proje
 ## Deploy from the command line
 
 The image has a chicken-and-egg sequence: the first deployment creates ACR and Container Apps with a public MCR placeholder image, then ACR builds the real app image, then the deployment runs again with the real tag.
+
+The following Bash commands deploy the default, verified Basic setup:
 
 ```bash
 az deployment sub create \
@@ -115,7 +116,24 @@ az deployment sub create \
   --parameters containerImage="$IMAGE"
 ```
 
-Wait about 10 minutes after the final deployment before testing. ARM can return `Succeeded` before private DNS, RBAC propagation, Container Apps revisions, and Foundry capability hosts are fully ready.
+To opt into Standard setup with network injection, add `enableAgentStandardSetup=true` to both deployment commands:
+
+```bash
+az deployment sub create \
+  --name aca-foundry-private-placeholder \
+  --location koreacentral \
+  --template-file infra/main.bicep \
+  --parameters infra/main.bicepparam enableAgentStandardSetup=true
+
+az deployment sub create \
+  --name aca-foundry-private-final \
+  --location koreacentral \
+  --template-file infra/main.bicep \
+  --parameters infra/main.bicepparam \
+  --parameters containerImage="$IMAGE" enableAgentStandardSetup=true
+```
+
+ARM returning `Succeeded` does not mean the Foundry data plane, RBAC assignments, private DNS, Container Apps revisions, and cold starts are ready. Allow a few minutes after deployment and use retries before testing.
 
 ## Set up the CI/CD pipeline
 
@@ -172,6 +190,7 @@ az identity federated-credential create \
   --issuer "https://token.actions.githubusercontent.com" \
   --subject "repo:$OWNER/$REPO:environment:production" \
   --audiences "api://AzureADTokenExchange"
+
 az role assignment create \
   --assignee-object-id "$PRINCIPAL_ID" \
   --assignee-principal-type ServicePrincipal \
@@ -196,15 +215,82 @@ Then add a required reviewer to the `production` environment in the GitHub repos
 
 ## Verify
 
-The positive verification runs as a Container Apps Job inside the VNet. A GitHub-hosted runner cannot reach the private app or private Foundry endpoint, so the workflow starts the job through the ARM control plane, polls its execution status, and reads the PASS/FAIL block from Log Analytics.
+Verification runs **inside** the VNet, but it can be started from a public machine through the ARM control plane. Use the console log stream and the manual-trigger Container Apps Job as the reliable signals.
 
-The deploy workflow also includes a negative control: it runs `curl` to the Foundry project endpoint and the Container App URL from the public runner and expects both to fail. If either public request succeeds, the workflow fails.
+Two positive verification mechanisms are included:
 
-Wait about 10 minutes after deployment before manual testing. `az deployment sub create` returning `Succeeded` means ARM accepted and created resources; it does not guarantee RBAC, private DNS, Foundry capability hosts, and Container Apps cold start are ready.
+1. The backend runs a startup self-test and prints the result to its console log. The app has no public ingress, but the log is readable through ARM:
+
+   ```bash
+   DEPLOYMENT=aca-foundry-private-final
+   RG=$(az deployment sub show \
+     --name "$DEPLOYMENT" \
+     --query properties.outputs.resourceGroupName.value \
+     -o tsv)
+   APP=$(az deployment sub show \
+     --name "$DEPLOYMENT" \
+     --query properties.outputs.containerAppName.value \
+     -o tsv)
+
+   az containerapp logs show \
+     --resource-group "$RG" \
+     --name "$APP" \
+     --tail 100
+   ```
+
+2. A manual-trigger Container Apps Job runs the same checks and exits non-zero on failure:
+
+   ```bash
+   JOB=$(az deployment sub show \
+     --name "$DEPLOYMENT" \
+     --query properties.outputs.verifyJobName.value \
+     -o tsv)
+
+   az containerapp job start \
+     --resource-group "$RG" \
+     --name "$JOB"
+
+   az containerapp job execution list \
+     --resource-group "$RG" \
+     --name "$JOB" \
+     --query "[].{name:name,status:properties.status}" \
+     -o table
+   ```
+
+Observed Basic-setup results:
+
+| Signal | Result |
+| --- | --- |
+| Foundry DNS from inside the VNet | `DNS  foundry   ai-<name>.services.ai.azure.com -> ['10.0.8.6'] private=True` |
+| Agent round trip | `AGENT round trip ok=True reply='PRIVATE_AGENT_PASS'` |
+| Backend startup self-test | `SELFTEST PASS` |
+| Container Apps Job execution | `Succeeded` |
+
+Negative control from the public internet:
+
+| Check | Result |
+| --- | --- |
+| Resolve the app's internal FQDN | Fails to resolve; no such host |
+| Resolve the Foundry FQDN | Resolves to a public address because of split-horizon DNS; inside the VNet the same name resolves to `10.0.8.6` |
+| Call the Foundry data plane with a valid Entra token | **HTTP 403** because `publicNetworkAccess: Disabled` blocks public data-plane access |
+
+Log Analytics ingestion was **not** observed for this environment during testing; no tables were created. Do not depend on a Log Analytics KQL query alone. Prefer the console log stream and the job exit code.
 
 ## Cost
 
-Approximate monthly cost while the lab is running:
+Approximate monthly cost while the lab is running. Model usage is workload-dependent and not included.
+
+### Basic setup + inbound private isolation (`enableAgentStandardSetup=false`)
+
+| Component | Estimate |
+| --- | ---: |
+| Foundry private endpoint | ~$10–15 |
+| Container Apps | ~$5–10 |
+| ACR Basic | ~$5 |
+| Log Analytics / DNS / miscellaneous | ~$5–10 |
+| **Total** | **~$25–40/month while running** |
+
+### Standard setup with network injection (`enableAgentStandardSetup=true`)
 
 | Component | Estimate |
 | --- | ---: |
@@ -213,15 +299,27 @@ Approximate monthly cost while the lab is running:
 | Container Apps | ~$10 |
 | Cosmos DB serverless | ~$10 |
 | ACR Basic | ~$5 |
-| Log Analytics | ~$5 |
-| Miscellaneous | ~$5 |
+| Storage, Key Vault, Log Analytics, DNS, miscellaneous | ~$5–15 |
 | **Total** | **~$135–160/month while running** |
 
 Tear down the lab when idle.
 
+## Implementation notes
+
+The current template includes fixes for issues found during live Azure validation:
+
+1. At subscription target scope, `resourceId(resourceGroupName, type, name)` binds the extra argument as a subscription ID and fails. Use `resourceId(subscription().subscriptionId, resourceGroupName, type, name)`.
+2. `gpt-4o-mini` version `2024-07-18` is in a deprecating state and is rejected for new deployments. The template uses `gpt-4.1-mini` version `2025-04-14` with `GlobalStandard` capacity.
+3. Azure Container Registry Basic SKU rejects a network rule set. AVM writes one whenever public access is enabled and the default action is `Deny`, so `networkRuleSetDefaultAction: 'Allow'` is required on Basic.
+4. A Container Apps environment cannot be read with an `existing` reference from a subscription-scope deployment. ARM resolves it eagerly, independent of `dependsOn`, and fails with `ResourceNotFound`. Use the module's `defaultDomain` and `staticIp` outputs.
+5. `platformReservedCidr` and `platformReservedDnsIP` are Consumption-only and are rejected on a workload-profiles Container Apps environment.
+6. An internal Container Apps environment publishes apps at `<app>.internal.<defaultDomain>`, including the extra `internal` label. Use the container app module's `fqdn` output.
+7. `DefaultAzureCredential` requests the system-assigned identity unless `AZURE_CLIENT_ID` is set. With only a user-assigned identity attached, the agent call fails to authenticate until that variable is provided.
+8. The network check treats an unset dependency FQDN as not applicable rather than failure, so the same image works in both isolation models.
+
 ## Teardown
 
-Use the teardown workflow and type the resource group name when prompted. It deletes the project capability host first because that resource can block resource-group deletion, then deletes the resource group, then purges the soft-deleted Foundry account and Key Vault.
+Use the teardown workflow and type the resource group name when prompted. It deletes the project capability host if present because that resource can block resource-group deletion, then deletes the resource group, then purges soft-deleted Foundry and Key Vault resources if present.
 
 Manual equivalent:
 
@@ -265,10 +363,11 @@ done < keyvaults-to-purge.tsv
 
 ## Known issues and gotchas
 
-- Deployment ordering matters: VNet and DNS, private endpoints, Foundry account, Foundry project, dependency connections, RBAC, capability host, Container Apps, then the smoke-test job.
+- With `enableAgentStandardSetup=true`, the `Microsoft.CognitiveServices/accounts` resource can remain in `Creating` state indefinitely when the account is created with `networkInjections` as part of the full template. This was observed for well over one hour with no error surfaced by ARM. Controlled minimal reproductions each succeeded in 7–13 minutes, isolating these as **not** the cause: the region, `publicNetworkAccess: 'Disabled'`, `disableLocalAuth: true`, the inline model deployment, private DNS zones linked to the VNet before the private endpoint exists, and a Container Apps environment coexisting in the same VNet. Root cause is still unresolved; treat network injection as needing extra provisioning time and verify before relying on it. The Basic-setup path is unaffected.
+- Deployment ordering matters: VNet and DNS, private endpoints, Foundry account, Foundry project, optional dependency connections, RBAC, optional capability host, Container Apps, then the smoke-test job.
 - Foundry capability hosts are immutable for several settings. Delete and recreate the project capability host when those settings change.
-- RBAC propagation can take several minutes. The deploy workflow uses bounded retry rather than assuming ARM completion means data-plane readiness.
-- `networkInjections` is creation-time-only for this PoC. Create the Foundry account with it from the start.
+- RBAC propagation can take several minutes. Use bounded retries rather than assuming ARM completion means data-plane readiness.
+- `networkInjections` is creation-time-only for this PoC. Create the Foundry account with it from the start if you need Standard setup.
 - Subnet sizing matters. The Container Apps environment uses `/23`, the injected agent runtime uses `/24`, and private endpoints use `/26`.
 - Class A private ranges and Foundry private networking can have regional constraints. Validate region support before changing `koreacentral`.
 
